@@ -9,3 +9,7 @@
 ## Flow Diagram
 
 ![Screenshot of Synonymous Extension](https://github.com/Abhiyb/Chrome-extention/blob/main/crome%20extentin%20design.PNG)  
+Get Selected Text Meaning:
+Summarize Text: 
+Pronounce Text: 
+Translate Text 
