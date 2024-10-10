@@ -6,3 +6,6 @@
 #### Click the "Load unpacked" button and select the folder where you downloaded the Synonymous extension. The extension will now be successfully added to your Chrome browser.
 
 ## How it works
+## Screenshots
+
+![Screenshot of Synonymous Extension](https://github.com/yourusername/yourrepository/blob/main/screenshots/screenshot1.png)  
