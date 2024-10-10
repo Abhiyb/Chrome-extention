@@ -8,4 +8,4 @@
 ## How it works
 ## Screenshots
 
-![Screenshot of Synonymous Extension](https://github.com/yourusername/yourrepository/blob/main/screenshots/screenshot1.png)  
+![Screenshot of Synonymous Extension](https://github.com/Abhiyb/Chrome-extention/blob/main/crome%20extentin%20design.PNG)  
