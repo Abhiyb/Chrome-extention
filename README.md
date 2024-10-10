@@ -1,5 +1,5 @@
 ## Synonymous Chrome Extension
-# 1.Download the Folder
+##### 1.Download the Folder
 2.Open Chrome Extensions
 3.Enable Developer Mode
 4.Load Unpacked Extension
