@@ -1,5 +1,4 @@
 const url = "https://api.ai21.com/studio/v1/j2-ultra/chat";
-
 const headers = {
   accept: "application/json",
   "content-type": "application/json",
@@ -10,227 +9,98 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log("Extension installed");
 
   // Create context menu items for features
-  chrome.contextMenus.create({
-    id: "getTextMeaning",
-    title: "Get Text Meaning",
-    contexts: ["selection"],
-  });
-
-  chrome.contextMenus.create({
-    id: "summarizeText",
-    title: "Summarize Text",
-    contexts: ["selection"],
-  });
-
-  chrome.contextMenus.create({
-    id: "Pronunce",
-    title: "Pronounce Text",
-    contexts: ["selection"],
-  });
-
-  chrome.contextMenus.create({
-    id: "translateText",
-    title: "Translate Text",
-    contexts: ["selection"],
-  });
+  createContextMenu("Get Text Meaning", "getTextMeaning");
+  createContextMenu("Summarize Text", "summarizeText");
+  createContextMenu("Pronounce Text", "pronunceText");
+  createContextMenu("Translate Text", "translateText");
 });
+
+// Helper function to create context menu items
+function createContextMenu(title, id) {
+  chrome.contextMenus.create({
+    id,
+    title,
+    contexts: ["selection"],
+  });
+}
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  console.log("Context menu item clicked");
+  const { selectionText } = info;
 
-  if (info.menuItemId === "getTextMeaning") {
-    console.log("Selected text:", info.selectionText);
-    const meaningData = await getSelectedTextMeaning(info.selectionText);
+  if (selectionText) {
+    const actionMap = {
+      getTextMeaning: showMeaning,
+      summarizeText: showSummary,
+      pronunceText: showPronunciation,
+      translateText: showLanguageSelection,
+    };
 
-    chrome.scripting.executeScript(
-      {
-        target: { tabId: tab.id },
-        files: ["content.js"],
-      },
-      () => {
-        chrome.tabs.sendMessage(tab.id, {
-          action: "showMeaningPopup",
-          data: meaningData,
-        });
-      }
-    );
-  }
-
-  if (info.menuItemId === "summarizeText") {
-    console.log("Selected text for summarization:", info.selectionText);
-
-    const summary = await summarizeText(info.selectionText);
-
-    chrome.scripting.executeScript(
-      {
-        target: { tabId: tab.id },
-        files: ["content.js"],
-      },
-      () => {
-        chrome.tabs.sendMessage(tab.id, {
-          action: "showSummaryPopup",
-          data: summary,
-        });
-      }
-    );
-  }
-
-  if (info.menuItemId === "Pronunce") {
-    console.log("Selected text for pronunciation:", info.selectionText);
-    const res = await pronunceText(info.selectionText);
-
-    chrome.scripting.executeScript(
-      {
-        target: { tabId: tab.id },
-        files: ["content.js"],
-      },
-      () => {
-        chrome.tabs.sendMessage(tab.id, {
-          action: "showPronunciationPopup",
-          data: { res, text: info.selectionText },
-        });
-      }
-    );
-  }
-
-  if (info.menuItemId === "translateText") {
-    console.log("Selected text for translation:", info.selectionText);
-
-    chrome.scripting.executeScript(
-      {
-        target: { tabId: tab.id },
-        files: ["content.js"],
-      },
-      () => {
-        chrome.tabs.sendMessage(tab.id, {
-          action: "showLanguageSelectionPopup",
-          data: info.selectionText,
-        });
-      }
-    );
+    const action = actionMap[info.menuItemId];
+    if (action) {
+      await action(selectionText, tab);
+    }
   }
 });
 
-async function getSelectedTextMeaning(selectedText) {
-  try {
-    const response = await fetch(
-      `https://api.dictionaryapi.dev/api/v2/entries/en/${selectedText}`
-    );
-    if (!response.ok) {
-      throw new Error("Failed to fetch meaning");
+// Handle actions
+async function showMeaning(text, tab) {
+  const meaningData = await getSelectedTextMeaning(text);
+  sendMessageToContent(tab, "showMeaningPopup", meaningData);
+}
+
+async function showSummary(text, tab) {
+  const summary = await summarizeText(text);
+  sendMessageToContent(tab, "showSummaryPopup", summary);
+}
+
+async function showPronunciation(text, tab) {
+  const pronunciation = await pronunceText(text);
+  sendMessageToContent(tab, "showPronunciationPopup", { pronunciation, text });
+}
+
+function showLanguageSelection(text, tab) {
+  sendMessageToContent(tab, "showLanguageSelectionPopup", text);
+}
+
+// Helper to send message to content script
+function sendMessageToContent(tab, action, data) {
+  chrome.scripting.executeScript(
+    { target: { tabId: tab.id }, files: ["content.js"] },
+    () => {
+      chrome.tabs.sendMessage(tab.id, { action, data });
     }
-    const data = await response.json();
-    return data;
+  );
+}
+
+async function getSelectedTextMeaning(text) {
+  try {
+    const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${text}`);
+    if (!response.ok) throw new Error("Failed to fetch meaning");
+    return await response.json();
   } catch (error) {
-    console.error("Error fetching meaning:", error);
+    console.error(error);
     return { error: "Failed to fetch meaning" };
   }
 }
 
 async function summarizeText(text) {
-  try {
-    const payload = {
-      numResults: 1,
-      temperature: 0.7,
-      messages: [
-        {
-          text: `Summarize ${text}`,
-          role: "user",
-        },
-      ],
-      system:
-        "You are an AI assistant for business research. Your responses should be informative and concise.",
-    };
-    const response = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      throw new Error("Failed to summarize text");
-    }
-    const data = await response.json();
-    return data.outputs;
-  } catch (error) {
-    console.error("Error summarizing text:", error);
-    return "Failed to summarize text";
-  }
+  const payload = { messages: [{ text: `Summarize ${text}`, role: "user" }], system: "Concise AI summary" };
+  return fetchDataFromApi(payload, "Failed to summarize text");
 }
 
 async function pronunceText(text) {
-  try {
-    const payload = {
-      numResults: 1,
-      temperature: 0.7,
-      messages: [
-        {
-          text: `give only pronunciation of ${text}`,
-          role: "user",
-        },
-      ],
-      system:
-        "You are an AI assistant for business research. Your responses should be informative and concise.",
-    };
-    const response = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      throw new Error("Failed to Pronounce text");
-    }
-    const data = await response.json();
-    return data.outputs[0].text;
-  } catch (error) {
-    console.error("Error Pronouncing text:", error);
-    return "Failed to Pronounce text";
-  }
+  const payload = { messages: [{ text: `Pronounce ${text}`, role: "user" }], system: "Pronunciation helper" };
+  return fetchDataFromApi(payload, "Failed to pronounce text");
 }
 
-async function translateText(text, targetLanguage) {
+async function fetchDataFromApi(payload, errorMessage) {
   try {
-    const payload = {
-      numResults: 1,
-      temperature: 0.7,
-      messages: [
-        {
-          text: `Translate this text to ${targetLanguage}: "${text}"`,
-          role: "user",
-        },
-      ],
-      system:
-        "You are an AI assistant for translation. Your responses should be informative and concise.",
-    };
-    console.log(text);
-    console.log(targetLanguage);
-    const response = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      throw new Error("Failed to translate text");
-    }
+    const response = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
+    if (!response.ok) throw new Error(errorMessage);
     const data = await response.json();
-    console.log(data);
-    return data.outputs[0].text;
+    return data.outputs[0].text || "No result";
   } catch (error) {
-    console.error("Error translating text:", error);
-    return "Failed to translate text";
+    console.error(error);
+    return errorMessage;
   }
 }
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "translateSelectedText") {
-    translateText(message.text, message.targetLanguage)
-      .then((translation) => {
-        console.log("Translation:", translation);
-        sendResponse({ translation });
-      })
-      .catch((error) => {
-        console.error("Error translating:", error);
-        sendResponse({ translation: null }); // Handle error case
-      });
-    return true; // Indicates that sendResponse will be called asynchronously
-  }
-});
